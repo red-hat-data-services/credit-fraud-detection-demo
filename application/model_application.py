@@ -4,6 +4,8 @@ import gradio as gr
 import numpy as np
 
 MLFLOW_ROUTE = os.getenv("MLFLOW_ROUTE")
+GRADIO_SERVER_PORT = int(os.getenv("GRADIO_SERVER_PORT"))
+GRADIO_SERVER_NAME = os.getenv("GRADIO_SERVER_NAME")
 
 mlflow.set_tracking_uri(MLFLOW_ROUTE)
 
@@ -22,4 +24,4 @@ def predict(distance_from_home,distance_from_last_transaction,ratio_to_median_pu
 
 demo = gr.Interface(fn=predict, inputs=["number","number","number","number","number","number","number"], outputs="number")
 
-demo.launch()   
+demo.launch(server_name=GRADIO_SERVER_NAME, server_port=GRADIO_SERVER_PORT)
