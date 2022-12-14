@@ -1,4 +1,4 @@
 /flagged/
-/mlruns/
+**/mlruns/
 /mlflow.db
 .env
