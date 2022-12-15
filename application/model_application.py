@@ -37,7 +37,7 @@ demo = gr.Interface(
         [57.87785658389723,0.3111400080477545,1.9459399775518593,1.0,1.0,0.0,0.0],
         [10.664473716016785,1.5657690862016613,4.886520843107555,1.0,0.0,0.0,1.0]
         ],
-    title="Predict Credit Fraud"
+    title="Predict Credit Card Fraud"
     )
 
 demo.launch(server_name=GRADIO_SERVER_NAME, server_port=GRADIO_SERVER_PORT)
