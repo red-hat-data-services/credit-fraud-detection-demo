@@ -3,7 +3,7 @@
 
 ## Pre-requisites:
 - Have [Red Hat OpenShift Data Science](/getting-started/openshift-data-science/) (RHODS) running in a cluster
-    - Note: You can use [Open Data Hub](/getting-started/opendatahub/) instead of RHODS, but this demo and all the screenshots are from RHODS
+    - Note: You can use [Open Data Hub](/getting-started/opendatahub/) instead of RHODS, but some instructions and screenshots may not apply
 - Have [MLFlow](/tools-and-applications/mlflow/mlflow/) running in a cluster
 
 ## Demo Description & Architecture
