@@ -8,7 +8,7 @@ RUN pip install -r requirements.txt
 
 ENV GRADIO_SERVER_PORT=8080
 ENV GRADIO_SERVER_NAME=0.0.0.0
-ENV MLFLOW_ROUTE=http://mlflow-server.mlflow.svc.cluster.local:8080
+# ENV MLFLOW_ROUTE=http://mlflow-server.mlflow.svc.cluster.local:8080
 
 EXPOSE 8080
 
