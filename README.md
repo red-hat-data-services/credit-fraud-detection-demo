@@ -126,9 +126,13 @@ with mlflow.start_run():
     mlflow.log_metric("fp", f_p)
     mlflow.log_metric("fn", f_n)
     mlflow.log_metric("tp", t_p)
+
+    model_proto,_ = tf2onnx.convert.from_keras(model)
+    mlflow.onnx.log_model(model_proto, "models")
 ```
 `with mlflow.start_run():` is used to tell MLFlow that we are starting a run, and we wrap our training code with it to define exactly what code belongs to the "run".  
-Most of the rest of the code in this cell is normal model training and evaluation code, but at the very bottom we can see how we send some custom metrics to MLFlow through `mlflow.log_metric`. We do this as custom metrics are not tracked by the autolog we enabled in the previous cell.
+Most of the rest of the code in this cell is normal model training and evaluation code, but at the bottom we can see how we send some custom metrics to MLFlow through `mlflow.log_metric` and then convert the model to ONNX. This is because ONNX is one of the standard formats for RHODS Serving we will use later.
+
 
 Now run all the cells in the notebook from top to bottom, either by clicking Shift-Enter on every cell, or by going to Run->Run All Cells in the very top menu.  
 If everything is set up correctly it will train the model and push both the run and the model to MLFlow.  
@@ -153,33 +157,64 @@ You can now click on the row in the Created column to get more information about
 
 ![MLFlow view](img/MLFlow_view.png)
 
-### 5: Deploy the model application
-The model application is a visual interface for interacting with the model. You can use it to send data to the model and get a prediction of whether a transaction is fraudulent or not.  
-It works by loading a specific model and model version from MLFlow, and running any data that comes in through the model.  
+We will need the Full Path of the model in the next section when we are going to serve it, keep this open. 
+
+![MLFlow Model Path](img/MLFlow_Model_Path.png)
+
+
+### 5: Serve the model
+Now that we have a model trained and tracked, let's serve it using RHODS Serving.
+We are going to need a few details to load and serve the model, so bear with me.
+
+To start, go to your RHODS Project and click "Add data connection".
+This data connection connects us to a storage we can load our models from.
+
+![Add Data Connection](img/Add_Data_Connection.png)
+
+Here we need to fill out a few details. These are all assuming that you set up MLFlow according to this [guide](/tools-and-applications/mlflow/mlflow/) and have it connected to ODF. If that's not the case then enter the relevant details for your usecase.
+
+- **Name**: I call it `mlflow-connection`, feel free to call it something else
+- **AWS_ACCESS_KEY_ID**: Run `kubectl get secret noobaa-admin -n openshift-storage -o json | jq -r '.data.AWS_ACCESS_KEY_ID|@base64d'` in your command prompt to get this, in my case it's `9bgVYBWLDEq4Bk7wpmoJ`
+- **AWS_SECRET_ACCESS_KEY**: Run `kubectl get secret noobaa-admin -n openshift-storage -o json | jq -r '.data.AWS_SECRET_ACCESS_KEY|@base64d'` in your command prompt to get this, in my case it's `kc7hb9stJ2uwxF1c0RibOkrQYc2yd0FoVS7CLzGV`.  
+NOTE: In my case the cluster and storage has already been shut down, don't share this in normal cases.
+- **AWS_S3_ENDPOINT**: Run `oc describe noobaa -n openshift-storage | grep https://s3-openshift-storage.apps` in your command prompt to get this, in my case it's `https://s3-openshift-storage.apps.cluster-nvj4w.nvj4w.sandbox944.opentlc.com`
+- **AWS_DEFAULT_REGION**: Where the cluster is being ran
+- **AWS_S3_BUCKET**: *TODO, Fill in with correct directions!* In my case it's `mlflow-server-576a6525-cc5b-46cb-95f3-62c3986846df`
+
+Then press "Add data connection".  
+Here's an example of how it can look like:  
+![Data Connection Details](img/Data_Connection_Details.png)
+
+Then we will configure a model server, which will serve our models.
+
+![Configure Model Server](img/Configure_Model_Server.png)
+
+Just check the 'Make deployed available via an external route' checkbox and then press "Configure" at the bottom.
+
+Finally, we will deply the model, to do that, press the "Deploy model" button which is in the same place that "Configure Model" was before.  
+We need to fill out a few settings here:
+
+- **Name**: I call it `credit card fraud`, feel free to call it something else
+- **Model framework**: If you recall from the model training section, we saved the model as ONNX, so select that here
+- **Model location**:
+    - **Name**: `mlflow-connection`
+    - **Folder path**: This is the full path we can see in the MLFlow interface from the end of the last section. In my case it's `1/b86481027f9b4b568c9efa3adc01929f/artifacts/models/` . Beware that we only need the last part which looks something like: `/1/..../artifacts/models`
+    ![MLFlow Model Path](img/MLFlow_Model_Path.png)
+
+![Deployment Model Options](img/Deployment_Model_Options.png)
+
+Press Deploy and wait for it to complete. It will show a green checkmark when done.  
+You can see the status here:
+
+![Deployment Status](img/Deployment_Status.png)
+
+We are going to need the "Inference endpoint" in the next section, so keep track of it.
+
+### 6: Deploy the model application
+The model application is a visual interface for interacting with the model. You can use it to send data to the model and get a prediction of whether a transaction is fraudulent or not.   
 You can find the model application code in the "application" folder in the GitHub repository you cloned in [step 3](#3-train-the-model).
 
 ![Model Application Folder](img/Model_Application_Folder.PNG)
-
-If you look inside `model_application.py` you are going to see a few particularly important lines of code:
-```
-# Get a few environment variables. These are so we can:
-# - get data from MLFlow
-# - Set server name and port for Gradio
-MLFLOW_ROUTE = os.getenv("MLFLOW_ROUTE")
-...
-
-# Connect to MLFlow using the route.
-mlflow.set_tracking_uri(MLFLOW_ROUTE)
-
-# Specify what model and version we want to load, and then load it.
-model_name = "DNN-credit-card-fraud"
-model_version = 1
-model = mlflow.pyfunc.load_model(
-    model_uri=f"models:/{model_name}/{model_version}"
-)
-```
-Here is where we set up everything that's needed for loading the model from MLFlow. The environment variable MLFLOW_ROUTE is set in the Dockerfile.  
-You can also see that we specifically load version 1 of the model called "DNN-credit-card-fraud" from MLFlow. This makes sense since we only ran the model once, but is easy to change if any other version or model should go into production
 
 We are going to deploy the application with OpenShift by pointing to the GitHub repository.  
 It will pull down the folder, automatically build a container image based on the Dockerfile, and publish it.
@@ -195,7 +230,7 @@ Finally, at the very bottom, click the blue "Deployment" link:
 
 ![Deployment Options](img/Deployment_Options.png)
 
-And add `MLFLOW_ROUTE` as Name and your route from [step one](#11-mlflow-route-through-the-visual-interface) as Value (`http://mlflow-server.mlflow.svc.cluster.local:8080` for example).
+And add `INFERENCE_ENDPOINT` as **Name** and your route from the [previous section](#5-serve-the-model) as **Value** (`https://credit-card-fraud-credit-card-fraud.apps.cluster-nvj4w.nvj4w.sandbox944.opentlc.com/v2/models/credit-card-fraud/infer` for example).
 
 Your full settings page should look something like this:
 
