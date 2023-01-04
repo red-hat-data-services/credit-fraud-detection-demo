@@ -1,30 +1,37 @@
 # Import the dependencies we need to run the code.
 import os
-import mlflow.pyfunc
+import requests
+import json
 import gradio as gr
 import numpy as np
 
-# Get a few environment variables. These are so we can:
-# - get data from MLFlow
+# Get a few environment variables. These are so we:
+# - Know what endpoint we should request
 # - Set server name and port for Gradio
-MLFLOW_ROUTE = os.getenv("MLFLOW_ROUTE")
+URL = os.getenv("INFERENCE_ENDPOINT")
 GRADIO_SERVER_PORT = int(os.getenv("GRADIO_SERVER_PORT"))
 GRADIO_SERVER_NAME = os.getenv("GRADIO_SERVER_NAME")
 
-# Connect to MLFlow using the route.
-mlflow.set_tracking_uri(MLFLOW_ROUTE)
-
-# Specify what model and version we want to load, and then load it.
-model_name = "DNN-credit-card-fraud"
-model_version = 1
-model = mlflow.pyfunc.load_model(
-    model_uri=f"models:/{model_name}/{model_version}"
-)
-
-
-# Create a small function that runs predictions on the loaded MLFlow model.
+# Create a small function that sends data to the inference endpoint and recieves a prediction
 def predict(distance_from_home,distance_from_last_transaction,ratio_to_median_purchase_price,repeat_retailer,used_chip,used_pin_number,online_order):
-    return "Fraud" if model.predict(np.array([[distance_from_home,distance_from_last_transaction,ratio_to_median_purchase_price,repeat_retailer,used_chip,used_pin_number,online_order]], dtype=np.float64))[0][0] >=0.995 else "Not fraud"
+    payload = {
+        "inputs": [
+            {
+                "name": "dense_input", 
+                "shape": [1, 7], 
+                "datatype": "FP32",
+                "data": [[distance_from_home,distance_from_last_transaction,ratio_to_median_purchase_price,repeat_retailer,used_chip,used_pin_number,online_order]]
+            },
+            ]
+        }
+    headers = {
+        'content-type': 'application/json'
+    }
+
+    response = requests.post(URL, json=payload, headers=headers)
+    prediction = response.json()['outputs'][0]['data'][0]
+
+    return "Fraud" if prediction >=0.995 else "Not fraud"
 
 
 # Create and launch a Gradio interface that uses the prediction function to predict an output based on the inputs. 
@@ -35,7 +42,7 @@ demo = gr.Interface(
     outputs="textbox",
     examples=[
         [57.87785658389723,0.3111400080477545,1.9459399775518593,1.0,1.0,0.0,0.0],
-        [10.664473716016785,1.5657690862016613,4.886520843107555,1.0,0.0,0.0,1.0]
+        [15.694985541059943,175.98918151972342,0.8556228290724207,1.0,0.0,0.0,1.0]
         ],
     title="Predict Credit Card Fraud"
     )
