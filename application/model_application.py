@@ -29,6 +29,8 @@ def predict(distance_from_home,distance_from_last_transaction,ratio_to_median_pu
         }
     headers = {
         'content-type': 'application/json',
+        'Access-Control-Request-Method': 'POST',
+        'Access-Control-Request-Headers': 'X-Requested-With'
     }
 
     response = requests.post(URL, json=payload, headers=headers)
