@@ -32,7 +32,7 @@ def predict(distance_from_home,distance_from_last_transaction,ratio_to_median_pu
     }
 
     response = requests.post(URL, json=payload, headers=headers)
-    log.info(response.text)
+    log.error(response.text)
     prediction = response.json()['outputs'][0]['data'][0]
 
     return "Fraud" if prediction >=0.995 else "Not fraud"
