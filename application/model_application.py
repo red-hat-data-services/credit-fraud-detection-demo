@@ -4,6 +4,9 @@ import requests
 import json
 import gradio as gr
 import numpy as np
+from logging import getLogger
+
+log = getLogger("testing")
 
 # Get a few environment variables. These are so we:
 # - Know what endpoint we should request
@@ -29,7 +32,7 @@ def predict(distance_from_home,distance_from_last_transaction,ratio_to_median_pu
     }
 
     response = requests.post(URL, json=payload, headers=headers)
-    print("RESPONSE: ", response.text)
+    log.info(response.text)
     prediction = response.json()['outputs'][0]['data'][0]
 
     return "Fraud" if prediction >=0.995 else "Not fraud"
